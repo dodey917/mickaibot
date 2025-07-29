@@ -1,5 +1,5 @@
-telegram-chatgpt-bot/
-├── .gitignore
+your-bot-folder/
+├── .gitignore     # Lists files to ignore (contains ".env")
+├── bot.py          # Main bot code
 ├── requirements.txt
-├── bot.py
-└── README.md (optional)
+└── .env            # LOCAL ONLY - contains secrets (not committed)
