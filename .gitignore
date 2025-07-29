@@ -1,7 +1,8 @@
 # Ignore environment files
 .env
 *.env
-
+TELEGRAM_TOKEN="8232773315:AAHjXo-Myc59vDCAM4E_XHuBAXWdN_0YpR4"
+OPENAI_API_KEY="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"
 # Ignore Python cache
 __pycache__/
 *.pyc
