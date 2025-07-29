@@ -1,5 +1,6 @@
 import os
 import openai
+import logging
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -8,15 +9,24 @@ from telegram.ext import (
     filters,
     ContextTypes
 )
-from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Configure logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
-# Configuration - Get secrets from environment variables
+# Get environment variables directly
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 PORT = int(os.getenv("PORT", 10000))
+
+# Validate required environment variables
+if not TELEGRAM_TOKEN or not OPENAI_API_KEY:
+    logger.error("MISSING REQUIRED ENVIRONMENT VARIABLES!")
+    logger.error("Please set both TELEGRAM_TOKEN and OPENAI_API_KEY")
+    raise ValueError("Missing required environment variables")
 
 # Initialize OpenAI client
 client = openai.OpenAI(api_key=OPENAI_API_KEY)
@@ -42,7 +52,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Initialize conversation history if new user
     if user_id not in conversations:
         conversations[user_id] = [
-            {"role": "system", "content": "You are a helpful assistant. Respond concisely and helpfully."}
+            {"role": "system", "content": "You are a helpful assistant."}
         ]
     
     # Add user message to history
@@ -71,18 +81,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(ai_reply)
     
     except Exception as e:
-        error_msg = f"⚠️ Error: {str(e)}"
-        await update.message.reply_text(error_msg[:4000])  # Truncate long errors
+        logger.error(f"API Error: {str(e)}")
+        await update.message.reply_text("⚠️ I encountered an error processing your request. Please try again later.")
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Reset conversation history with /reset"""
     user_id = update.message.from_user.id
     conversations[user_id] = [
-        {"role": "system", "content": "You are a helpful assistant. Respond concisely and helpfully."}
+        {"role": "system", "content": "You are a helpful assistant."}
     ]
     await update.message.reply_text("🔄 Conversation history cleared!")
 
 def main() -> None:
+    """Start the bot."""
+    logger.info("Starting bot...")
+    
     # Create Telegram application
     app = Application.builder().token(TELEGRAM_TOKEN).build()
     
@@ -92,21 +105,22 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     # Check if running on Render
-    is_render = os.getenv("RENDER", False)
+    is_render = os.getenv("RENDER", "false").lower() == "true"
     
     if is_render:
         # Webhook configuration for Render
         public_url = os.getenv("RENDER_EXTERNAL_URL")
         
-        # Construct URL if not provided
         if not public_url:
+            # Fallback URL construction
             service_name = os.getenv("RENDER_SERVICE_NAME")
             if service_name:
                 public_url = f"https://{service_name}.onrender.com"
             else:
-                raise ValueError("Missing RENDER_EXTERNAL_URL environment variable")
+                logger.error("Missing RENDER_EXTERNAL_URL environment variable")
+                raise RuntimeError("Missing RENDER_EXTERNAL_URL environment variable")
         
-        print(f"🤖 Starting webhook mode on {public_url}")
+        logger.info(f"Starting webhook mode on {public_url}")
         app.run_webhook(
             listen="0.0.0.0",
             port=PORT,
@@ -115,15 +129,11 @@ def main() -> None:
         )
     else:
         # Polling mode for local development
-        print("🤖 Starting polling mode...")
+        logger.info("Starting polling mode...")
         app.run_polling(
             drop_pending_updates=True,
             allowed_updates=Update.ALL_TYPES
         )
 
 if __name__ == "__main__":
-    # Verify required environment variables
-    if not TELEGRAM_TOKEN or not OPENAI_API_KEY:
-        raise ValueError("Missing required environment variables: TELEGRAM_TOKEN or OPENAI_API_KEY")
-    
     main()
