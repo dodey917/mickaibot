@@ -1,0 +1,5 @@
+telegram-chatgpt-bot/
+├── .gitignore
+├── requirements.txt
+├── bot.py
+└── README.md (optional)
